@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#121212">
+    <title>Number Tracker</title>
+    
+    <!-- PWA Manifest Link -->
+    <link rel="manifest" href="manifest.json">
+    
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .app-container {
+            width: 100%;
+            max-width: 400px;
+        }
+        .view {
+            display: none;
+        }
+        .view.active {
+            display: block;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #ffffff;
+        }
+        /* Dashboard Card Styles */
+        .card {
+            background: #1e1e1e;
+            padding: 18px;
+            border-radius: 14px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .card-info span {
+            display: block;
+            font-size: 13px;
+            color: #9ca3af;
+            margin-bottom: 4px;
+        }
+        .card-info strong {
+            font-size: 20px;
+            color: #34d399;
+            font-weight: 600;
+        }
+        .manage-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .manage-btn:active {
+            transform: scale(0.96);
+        }
+        /* Detail View Styles */
+        .back-btn {
+            background: none;
+            border: none;
+            color: #9ca3af;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 0;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .back-btn:hover {
+            color: #ffffff;
+        }
+        .hero-display {
+            text-align: center;
+            background: #1e1e1e;
+            padding: 24px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+        }
+        .hero-label {
+            font-size: 13px;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .hero-value {
+            font-size: 38px;
+            font-weight: 700;
+            color: #34d399;
+        }
+        input[type="number"] {
+            width: 100%;
+            background: #1e1e1e;
+            border: 2px solid #333333;
+            color: white;
+            font-size: 20px;
+            padding: 14px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 16px;
+            outline: none;
+        }
+        input[type="number"]:focus {
+            border-color: #3b82f6;
+        }
+        .action-row {
+            display: flex;
+            gap: 12px;
+        }
+        .btn-add, .btn-sub {
+            flex: 1;
+            padding: 14px;
+            border-radius: 12px;
+            border: none;
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .btn-add { background: #059669; }
+        .btn-add:active { background: #047857; }
+        .btn-sub { background: #dc2626; }
+        .btn-sub:active { background: #b91c1c; }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- VIEW 1: MAIN DASHBOARD -->
+        <div id="dashboard-view" class="view active">
+            <h1>Dashboard</h1>
+            
+            <div class="card">
+                <div class="card-info">
+                    <span>Balance A</span>
+                    <strong id="display-a">0.00</strong>
+                </div>
+                <button class="manage-btn" onclick="openTracker('Balance A')">Manage ➔</button>
+            </div>
+
+            <div class="card">
+                <div class="card-info">
+                    <span>Balance B</span>
+                    <strong id="display-b">0.00</strong>
+                </div>
+                <button class="manage-btn" onclick="openTracker('Balance B')">Manage ➔</button>
+            </div>
+        </div>
+
+        <!-- VIEW 2: DETAIL TRACKER -->
+        <div id="tracker-view" class="view">
+            <button class="back-btn" onclick="goHome()">← Back to Dashboard</button>
+            
+            <h1 id="tracker-title" style="margin-bottom: 10px;">Balance</h1>
+            
+            <div class="hero-display">
+                <div class="hero-label">Current Value</div>
+                <div class="hero-value" id="tracker-value">0.00</div>
+            </div>
+
+            <input type="number" id="amount-input" step="any" placeholder="Enter amount" inputmode="decimal" autocomplete="off">
+
+            <div class="action-row">
+                <button class="btn-add" onclick="modifyBalance(1)">Add (+)</button>
+                <button class="btn-sub" onclick="modifyBalance(-1)">Subtract (-)</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load data from phone's local storage or default to 0
+        let balances = JSON.parse(localStorage.getItem('app_balances')) || {
+            "Balance A": 0.0,
+            "Balance B": 0.0
+        };
+
+        let activeBalance = null;
+
+        function saveData() {
+            localStorage.setItem('app_balances', JSON.stringify(balances));
+        }
+
+        function updateDashboardUI() {
+            document.getElementById('display-a').innerText = balances["Balance A"].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('display-b').innerText = balances["Balance B"].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        function openTracker(name) {
+            activeBalance = name;
+            document.getElementById('tracker-title').innerText = name;
+            document.getElementById('tracker-value').innerText = balances[name].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            
+            document.getElementById('dashboard-view').classList.remove('active');
+            document.getElementById('tracker-view').classList.add('active');
+            
+            const input = document.getElementById('amount-input');
+            input.value = '';
+            setTimeout(() => input.focus(), 50);
+        }
+
+        function goHome() {
+            updateDashboardUI();
+            document.getElementById('tracker-view').classList.remove('active');
+            document.getElementById('dashboard-view').classList.add('active');
+        }
+
+        function modifyBalance(multiplier) {
+            const input = document.getElementById('amount-input');
+            const val = parseFloat(input.value);
+            
+            if (isNaN(val)) return;
+
+            balances[activeBalance] += (val * multiplier);
+            saveData();
+
+            document.getElementById('tracker-value').innerText = balances[activeBalance].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            
+            input.value = '';
+            input.focus();
+        }
+
+        updateDashboardUI();
+
+        // Register Service Worker for PWA offline support
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
+</body>
+</html>
