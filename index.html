@@ -111,27 +111,19 @@
             font-weight: 700;
             color: #34d399;
         }
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-bottom: 16px;
-        }
-        input[type="number"], input[type="text"] {
+        input[type="number"] {
             width: 100%;
             background: #1e1e1e;
             border: 2px solid #333333;
             color: white;
-            font-size: 16px;
+            font-size: 18px;
             padding: 12px;
             border-radius: 12px;
+            text-align: center;
+            margin-bottom: 12px;
             outline: none;
         }
-        input[type="number"] {
-            text-align: center;
-            font-size: 18px;
-        }
-        input:focus {
+        input[type="number"]:focus {
             border-color: #3b82f6;
         }
         .action-row {
@@ -190,9 +182,6 @@
         .history-item.positive { border-left-color: #059669; }
         .history-item.negative { border-left-color: #dc2626; }
         
-        .history-details {
-            max-width: 65%;
-        }
         .history-details span {
             display: block;
         }
@@ -203,15 +192,10 @@
         .history-item.positive .history-amount { color: #34d399; }
         .history-item.negative .history-amount { color: #f87171; }
         
-        .history-meta {
+        .history-time {
             font-size: 11px;
             color: #888;
             margin-top: 2px;
-        }
-        .history-note {
-            color: #d1d5db;
-            font-style: italic;
-            word-break: break-word;
         }
         .history-balance {
             font-size: 13px;
@@ -259,4 +243,146 @@
             <h1 id="tracker-title" style="margin-bottom: 10px;">Balance</h1>
             
             <div class="hero-display">
-                <div class="hero-label">
+                <div class="hero-label">Current Value</div>
+                <div class="hero-value" id="tracker-value">0.00</div>
+            </div>
+
+            <input type="number" id="amount-input" step="any" placeholder="Enter amount" inputmode="decimal" autocomplete="off">
+
+            <div class="action-row">
+                <button class="btn-add" onclick="modifyBalance(1)">Add (+)</button>
+                <button class="btn-sub" onclick="modifyBalance(-1)">Subtract (-)</button>
+            </div>
+
+            <!-- HISTORY LOG CONTAINER -->
+            <div class="history-section-title">
+                <span>Transaction History</span>
+                <button class="clear-history-btn" onclick="clearHistory()">Clear History</button>
+            </div>
+            <div id="history-list" class="history-list">
+                <!-- Injected via JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load data from phone's local storage or default
+        let appData = JSON.parse(localStorage.getItem('app_data_v2')) || {
+            balances: { "Balance A": 0.0, "Balance B": 0.0 },
+            history: { "Balance A": [], "Balance B": [] }
+        };
+
+        let activeBalance = null;
+
+        function saveData() {
+            localStorage.setItem('app_data_v2', JSON.stringify(appData));
+        }
+
+        function updateDashboardUI() {
+            document.getElementById('display-a').innerText = appData.balances["Balance A"].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('display-b').innerText = appData.balances["Balance B"].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        function openTracker(name) {
+            activeBalance = name;
+            document.getElementById('tracker-title').innerText = name;
+            document.getElementById('tracker-value').innerText = appData.balances[name].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            
+            renderHistory();
+
+            document.getElementById('dashboard-view').classList.remove('active');
+            document.getElementById('tracker-view').classList.add('active');
+            
+            const input = document.getElementById('amount-input');
+            input.value = '';
+            setTimeout(() => input.focus(), 50);
+        }
+
+        function goHome() {
+            updateDashboardUI();
+            document.getElementById('tracker-view').classList.remove('active');
+            document.getElementById('dashboard-view').classList.add('active');
+        }
+
+        function modifyBalance(multiplier) {
+            const input = document.getElementById('amount-input');
+            const val = parseFloat(input.value);
+            
+            if (isNaN(val) || val === 0) return;
+
+            const changeAmount = val * multiplier;
+            appData.balances[activeBalance] += changeAmount;
+
+            // Create transaction log entry
+            const now = new Date();
+            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' });
+            
+            const transaction = {
+                type: multiplier > 0 ? 'add' : 'sub',
+                amount: val,
+                newTotal: appData.balances[activeBalance],
+                time: timeString
+            };
+
+            // Push to the beginning of the history array so newest is on top
+            if (!appData.history[activeBalance]) {
+                appData.history[activeBalance] = [];
+            }
+            appData.history[activeBalance].unshift(transaction);
+
+            saveData();
+
+            // Update UI
+            document.getElementById('tracker-value').innerText = appData.balances[activeBalance].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            renderHistory();
+            
+            input.value = '';
+            input.focus();
+        }
+
+        function renderHistory() {
+            const listContainer = document.getElementById('history-list');
+            const historyArray = appData.history[activeBalance] || [];
+
+            if (historyArray.length === 0) {
+                listContainer.innerHTML = '<div class="no-history">No transactions yet</div>';
+                return;
+            }
+
+            let html = '';
+            historyArray.forEach(tx => {
+                const sign = tx.type === 'add' ? '+' : '-';
+                const cssClass = tx.type === 'add' ? 'positive' : 'negative';
+                
+                html += `
+                    <div class="history-item ${cssClass}">
+                        <div class="history-details">
+                            <span class="history-amount">${sign}${tx.amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                            <span class="history-time">${tx.time}</span>
+                        </div>
+                        <div class="history-balance">
+                            <span>Balance</span>
+                            <strong>${tx.newTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>
+                        </div>
+                    </div>
+                `;
+            });
+            listContainer.innerHTML = html;
+        }
+
+        function clearHistory() {
+            if (confirm(`Clear all history for ${activeBalance}?`)) {
+                appData.history[activeBalance] = [];
+                saveData();
+                renderHistory();
+            }
+        }
+
+        updateDashboardUI();
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
+</body>
+</html>
